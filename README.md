@@ -38,7 +38,3 @@ cosmosis configs/forecast_M2e14_A4000_sd10_sm10.ini
 ```
 
 Outputs (chains, fits) are written under `output/`.
-
-## Contact
-
-Xin Tang (xt52@sussex.ac.uk)
