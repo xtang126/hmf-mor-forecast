@@ -1,0 +1,12 @@
+output/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editors / OS
+.DS_Store
+.vscode/
+
+# Local Claude Code session settings
+.claude/
