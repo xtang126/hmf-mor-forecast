@@ -37,30 +37,28 @@ from scipy.special import gammaln
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-H_LITTLE = 0.7
-H0 = H_LITTLE * 100.0        # km/s/Mpc
 FULL_SKY_DEG2 = 41253.0
 
 
 # ---------------------------------------------------------------------------
 # Comoving volume of a redshift shell (returned in (Mpc/h)^3)
 # ---------------------------------------------------------------------------
-def _volume_shell(zmin, zmax, Om0, area_deg2):
-    cosmo = FlatLambdaCDM(H0=H0, Om0=Om0)
+def _volume_shell(zmin, zmax, Om0, area_deg2, h0):
+    cosmo = FlatLambdaCDM(H0=h0 * 100.0, Om0=Om0)
     V = (cosmo.comoving_volume(zmax) - cosmo.comoving_volume(zmin)).to(u.Mpc**3).value
-    V /= H_LITTLE**3
+    V /= h0**3
     return V * (area_deg2 / FULL_SKY_DEG2)
 
 
 @lru_cache(maxsize=2000)
-def _volume_shell_cached(z1, z2, om_r, area_r):
-    return _volume_shell(float(z1), float(z2), float(om_r), float(area_r))
+def _volume_shell_cached(z1, z2, om_r, area_r, h0_r):
+    return _volume_shell(float(z1), float(z2), float(om_r), float(area_r), float(h0_r))
 
 
-def volume_shell(zmin, zmax, Om0, area_deg2):
+def volume_shell(zmin, zmax, Om0, area_deg2, h0):
     return _volume_shell_cached(
         round(zmin, 4), round(zmax, 4),
-        round(Om0, 5),  round(area_deg2, 3),
+        round(Om0, 5),  round(area_deg2, 3), round(h0, 5),
     )
 
 
@@ -120,14 +118,14 @@ def build_migration_matrix(M_edges_logh, sigma_logM_per_bin):
 # ---------------------------------------------------------------------------
 # True counts per mass bin at given cosmology
 # ---------------------------------------------------------------------------
-def compute_true_counts(mf, M_edges_logh, V, z_mid, omegam=None, sigma8=None):
+def compute_true_counts(mf, M_edges_logh, V, z_mid, omegam=None, sigma8=None, h0=None):
     edges = np.asarray(M_edges_logh)
 
-    if (omegam is not None) or (sigma8 is not None):
+    if (omegam is not None) or (sigma8 is not None) or (h0 is not None):
         mf.update(
             z=z_mid,
             sigma_8=sigma8,
-            cosmo_params={"H0": H0, "Om0": omegam},
+            cosmo_params={"H0": h0 * 100.0, "Om0": omegam},
             Mmin=edges[0],
             Mmax=edges[-1],
         )
@@ -149,11 +147,14 @@ def setup(options):
     # --- Fiducial cosmology (mock generation only) ---
     Om0_fid    = options.get_double(option_section, "Om0_fid",    default=0.318)
     sigma8_fid = options.get_double(option_section, "sigma8_fid", default=0.80)
+    h0_fid     = options.get_double(option_section, "h0_fid",     default=0.7)
 
-    # --- Redshift bin ---
-    zmin = options.get_double(option_section, "z_min", default=0.3)
-    zmax = options.get_double(option_section, "z_max", default=0.5)
-    z_mid = 0.5 * (zmin + zmax)
+    # --- Redshift range and binning ---
+    zmin = options.get_double(option_section, "z_min", default=0.1)
+    zmax = options.get_double(option_section, "z_max", default=1.0)
+    n_z_bins = options.get_int(option_section, "n_z_bins", default=9)
+    z_edges = np.linspace(zmin, zmax, n_z_bins + 1)
+    z_mids = 0.5 * (z_edges[:-1] + z_edges[1:])
 
     # --- Survey area ---
     area_deg2 = options.get_double(option_section, "area_deg2", default=4000.0)
@@ -175,30 +176,36 @@ def setup(options):
     sigma_logM_data  = sigma_logM_from_MOR(frac_data,  alpha_MOR)
     sigma_logM_model = sigma_logM_from_MOR(frac_model, alpha_MOR)
 
-    # --- MassFunction: one instance, updated per sample ---
+    # --- MassFunction: one instance, updated per sample and per z-bin ---
     mf = MassFunction(
-        z=z_mid,
+        z=z_mids[0],
         sigma_8=sigma8_fid,
-        cosmo_params={"H0": H0, "Om0": Om0_fid},
+        cosmo_params={"H0": h0_fid * 100.0, "Om0": Om0_fid},
         Mmin=M_edges_logh[0],
         Mmax=M_edges_logh[-1],
         dlog10m=0.1,
         hmf_model="Tinker08",
     )
 
-    # --- Mock data (TRUE scatter) ---
-    V_fid = volume_shell(zmin, zmax, Om0_fid, area_deg2)
-    N_true_fid = compute_true_counts(mf, M_edges_logh, V_fid, z_mid)
+    # --- Mock data (TRUE scatter), true counts per (z-bin, mass-bin) ---
+    N_true_fid = np.zeros((n_z_bins, n_mass_bins))
+    for k in range(n_z_bins):
+        V_k = volume_shell(z_edges[k], z_edges[k + 1], Om0_fid, area_deg2, h0_fid)
+        N_true_fid[k] = compute_true_counts(
+            mf, M_edges_logh, V_k, z_mids[k],
+            omegam=Om0_fid, sigma8=sigma8_fid, h0=h0_fid,
+        )
     P_data = build_migration_matrix(M_edges_logh, sigma_logM_data)
-    N_obs = np.clip(P_data @ N_true_fid, np.finfo(float).eps, None)
+    N_obs = np.clip(N_true_fid @ P_data.T, np.finfo(float).eps, None)
 
     # --- Model migration matrix: fixed, or rebuilt in execute if marginalising ---
     P_model_fixed = build_migration_matrix(M_edges_logh, sigma_logM_model)
 
     # --- Sanity print ---
     print("[hmf_mor_forecast] ================ setup ================")
-    print(f"  z in [{zmin:.3f}, {zmax:.3f}],  area = {area_deg2:.0f} deg^2")
-    print(f"  mass in [{mmin:.2e}, {mmax:.2e}] Msun/h,  n_bins = {n_mass_bins}")
+    print(f"  h0_fid             = {h0_fid:.3f}")
+    print(f"  z in [{zmin:.3f}, {zmax:.3f}],  n_z_bins = {n_z_bins},  area = {area_deg2:.0f} deg^2")
+    print(f"  mass in [{mmin:.2e}, {mmax:.2e}] Msun/h,  n_mass_bins = {n_mass_bins}")
     print(f"  alpha_MOR          = {alpha_MOR:.3f}")
     print(f"  frac_scatter_data  = {frac_data:.3f}  -> sigma_logM = {sigma_logM_data:.4f} dex")
     print(f"  frac_scatter_model = {frac_model:.3f}  -> sigma_logM = {sigma_logM_model:.4f} dex")
@@ -208,9 +215,9 @@ def setup(options):
     print("[hmf_mor_forecast] =======================================")
 
     return {
-        "zmin": zmin,
-        "zmax": zmax,
-        "z_mid": z_mid,
+        "z_edges": z_edges,
+        "z_mids": z_mids,
+        "n_z_bins": n_z_bins,
         "area_deg2": area_deg2,
         "M_edges_logh": M_edges_logh,
         "mf": mf,
@@ -228,6 +235,7 @@ def setup(options):
 def execute(block, config):
     omegam = block[names.cosmological_parameters, "omega_m"]
     sigma8 = block[names.cosmological_parameters, "sigma8_input"]
+    h0     = block[names.cosmological_parameters, "h0"]
 
     # Model migration matrix: fixed, or rebuilt from a sampled nuisance param
     if config["marginalise"]:
@@ -237,15 +245,20 @@ def execute(block, config):
     else:
         P_model = config["P_model_fixed"]
 
-    # Volume at this cosmology
-    V = volume_shell(config["zmin"], config["zmax"], omegam, config["area_deg2"])
+    # True counts per (z-bin, mass-bin) at this cosmology
+    z_edges = config["z_edges"]
+    z_mids = config["z_mids"]
+    n_z_bins = config["n_z_bins"]
+    M_edges_logh = config["M_edges_logh"]
 
-    # True model counts and scattered model counts
-    N_true = compute_true_counts(
-        config["mf"], config["M_edges_logh"], V, config["z_mid"],
-        omegam=omegam, sigma8=sigma8,
-    )
-    N_model = np.clip(P_model @ N_true, 1e-12, None)
+    N_true = np.zeros((n_z_bins, M_edges_logh.size - 1))
+    for k in range(n_z_bins):
+        V_k = volume_shell(z_edges[k], z_edges[k + 1], omegam, config["area_deg2"], h0)
+        N_true[k] = compute_true_counts(
+            config["mf"], M_edges_logh, V_k, z_mids[k],
+            omegam=omegam, sigma8=sigma8, h0=h0,
+        )
+    N_model = np.clip(N_true @ P_model.T, 1e-12, None)
 
     # Poisson log-likelihood
     N_obs = config["N_obs"]
