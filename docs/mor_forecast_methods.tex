@@ -1,0 +1,216 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{siunitx}
+
+\title{Cluster Number-Count Forecast with Mass--Observable Scatter:\\ Method Summary}
+\author{Xin Tang}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Model}
+
+\subsection{Halo mass function}
+
+The comoving number density of haloes per unit halo mass is $dn/dM$,
+computed from the Tinker et al.~(2008) fitting function via the
+\texttt{hmf} package. The expected number of haloes with true mass in
+bin $[M_j, M_{j+1}]$ and redshift in $[z_{\min}, z_{\max}]$ over a survey
+of area $\Omega_s$ is
+\begin{equation}
+    N_j^{\rm true}(\Omega_m, \sigma_8)
+    \;=\; V_{\rm shell}(\Omega_m, \Omega_s) \, \int_{M_j}^{M_{j+1}} \frac{dn}{dM}\, dM ,
+    \label{eq:Ntrue}
+\end{equation}
+with the comoving volume of the shell
+\begin{equation}
+    V_{\rm shell}
+    \;=\; \frac{\Omega_s}{\Omega_{\rm sky}}
+    \bigl[ V_c(z_{\max}) - V_c(z_{\min}) \bigr],
+    \qquad \Omega_{\rm sky} = 41253\,{\rm deg}^2 .
+\end{equation}
+
+\subsection{Mass--observable relation}
+
+We adopt the standard log-normal MOR (Kaiser 1986; Stanek et al.~2006;
+Evrard et al.~2014),
+\begin{equation}
+    \ln O \;=\; \ln A
+    \;+\; \alpha \ln\!\left(\frac{M}{M_{\rm piv}}\right)
+    \;+\; \beta  \ln\!\left(\frac{1+z}{1+z_{\rm piv}}\right)
+    \;+\; \varepsilon,
+    \qquad \varepsilon \sim \mathcal{N}(0,\, \sigma_{\ln O}^{2}) .
+    \label{eq:MOR}
+\end{equation}
+Defining the \emph{inferred mass} $\hat M$ by inversion of the mean
+relation and subtracting from Eq.~\eqref{eq:MOR}, the normalisation,
+pivot, and redshift terms cancel, leaving
+\begin{equation}
+    \ln \hat M \;=\; \ln M \;+\; \frac{\varepsilon}{\alpha}
+    \;\Longrightarrow\;
+    P(\ln \hat M \,|\, \ln M)
+    \;=\; \mathcal{N}\!\left(\ln M,\; \left(\sigma_{\ln O}/\alpha\right)^{2}\right).
+    \label{eq:invert}
+\end{equation}
+Converting to base-10 logarithms,
+\begin{equation}
+    \boxed{\;\sigma_{\log_{10}\! M} \;=\; \frac{\sigma_{\ln O}}{\alpha \ln 10}
+    \;\approx\; \frac{f_{\rm obs}}{\alpha \ln 10}\;},
+    \label{eq:sigmalogM}
+\end{equation}
+where $f_{\rm obs} \approx \sigma_O/\langle O \rangle$ is the fractional
+scatter in the observable (valid for $\sigma_{\ln O} \lesssim 0.3$).
+Because Eq.~\eqref{eq:sigmalogM} contains only the ratio
+$\sigma_{\ln O}/\alpha$, the forecast is observable-agnostic: $A$,
+$M_{\rm piv}$, $\beta$, and $z_{\rm piv}$ do not enter.
+
+\subsection{Migration matrix}
+
+On a grid of $\log_{10} M$ bin edges $\{x_i\}$ with true-bin centres
+$\bar x_j$, the probability that a true-bin-$j$ halo is placed in
+observed bin $i$ is
+\begin{equation}
+    P_{ij} \;=\;
+    \Phi\!\left(\frac{x_{i+1} - \bar x_j}{\sigma_{\log_{10}\! M}}\right)
+    -\;
+    \Phi\!\left(\frac{x_i     - \bar x_j}{\sigma_{\log_{10}\! M}}\right),
+    \qquad \sum_i P_{ij} \equiv 1,
+    \label{eq:migration}
+\end{equation}
+with $\Phi$ the standard-normal CDF. Two matrices are stored:
+$\mathbf{P}_{\rm data}$ built from the true (data-generating)
+scatter, and $\mathbf{P}_{\rm model}$ built from the scatter assumed
+in the fit. The two need not be equal.
+
+\subsection{Observed counts and likelihood}
+
+The expected observed counts per bin are
+\begin{equation}
+    N_i^{\rm obs}(\Omega_m, \sigma_8)
+    \;=\; \sum_j P_{ij}\, N_j^{\rm true}(\Omega_m, \sigma_8) .
+    \label{eq:Nobs}
+\end{equation}
+Adopting a Poisson likelihood (independent bins, no shot-noise
+covariance),
+\begin{equation}
+    \ln \mathcal{L}(\Omega_m, \sigma_8)
+    \;=\; \sum_i \Bigl[
+        N_i^{\rm data}\, \ln N_i^{\rm obs}
+        \;-\; N_i^{\rm obs}
+        \;-\; \ln \Gamma(N_i^{\rm data} + 1)
+    \Bigr] .
+    \label{eq:like}
+\end{equation}
+The mock data vector $N_i^{\rm data}$ is generated once at fiducial
+$(\Omega_m^{\rm fid}, \sigma_8^{\rm fid})$ using
+$\mathbf{P}_{\rm data}$; no Poisson noise is added, so the
+recovered posterior is centred on the fiducial when the model is
+correctly specified.
+
+\section{Forecast scenarios}
+
+Four assumption modes are supported by varying the model-side
+scatter $f_{\rm obs}^{\rm model}$ relative to the data-side
+$f_{\rm obs}^{\rm data}$:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Scenario                 & Setting                                                                 & Question addressed                             \\
+\midrule
+Correct assumption       & $f^{\rm model} = f^{\rm data}$, fixed                                   & Best-case statistical precision                \\
+Ignore scatter           & $f^{\rm model} = 0$                                                     & Bias from neglecting scatter                   \\
+Wrong scatter value      & $f^{\rm model} \ne f^{\rm data}$, fixed                                 & Sensitivity to miscalibration                  \\
+Marginalise over scatter & $f^{\rm model}$ sampled with prior                                      & Realistic constraints with unknown scatter     \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Input parameters}
+
+\subsection{Fixed configuration}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Symbol                     & Value                                             & Description                          \\
+\midrule
+$h$                        & $0.7$                                             & Reduced Hubble constant              \\
+$\Omega_m^{\rm fid}$       & $0.318$                                           & Fiducial matter density              \\
+$\sigma_8^{\rm fid}$       & $0.80$                                            & Fiducial power-spectrum amplitude    \\
+$z_{\min}, z_{\max}$       & $0.3,\, 0.5$                                      & Redshift shell                       \\
+HMF model                  & Tinker08                                          & From \texttt{hmf} package            \\
+Number of mass bins        & $10$                                              & Linear in $\log_{10} M$              \\
+$\alpha_{\rm MOR}$         & $1.0$                                             & Default MOR mass slope               \\
+Sampler                    & \texttt{emcee}, 40 walkers                        & CosmoSIS backend                     \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Forecast grid}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Axis                                  & Values                                       & Notes                                                \\
+\midrule
+Mass threshold $M_{\min}$             & $5{\times}10^{13},\, 2{\times}10^{14}\,M_\odot h^{-1}$  & $M_{\max} = 5{\times}10^{15}\,M_\odot h^{-1}$        \\
+Survey area $\Omega_s$                & $1000,\, 2000,\, 4000,\, 8000$~deg$^2$        & X-ray-like survey                                    \\
+Fractional scatter $f_{\rm obs}$      & $0.05,\, 0.10,\, 0.20$                        & In the observable                                    \\
+Assumption mode                       & correct / ignore / wrong / marginalise        & See table above                                      \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Sampled parameters and priors}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Parameter          & Prior                     & Sampled when                       \\
+\midrule
+$\Omega_m$         & Uniform$(0.1,\, 0.5)$     & Always                             \\
+$\sigma_8$         & Uniform$(0.6,\, 1.0)$     & Always                             \\
+$f_{\rm obs}^{\rm model}$ & Uniform$(0.0,\, 0.4)$ & Marginalise-over-scatter mode      \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Outputs}
+
+For each grid point the pipeline produces an MCMC chain in
+$(\Omega_m, \sigma_8)$ (and $f_{\rm obs}^{\rm model}$ when
+marginalising). The headline forecast products are:
+\begin{enumerate}
+    \item 68\% and 95\% credible contours in the $(\Omega_m, \sigma_8)$
+          plane for each scenario.
+    \item Bias of the posterior mean from the fiducial point, as a
+          function of the mismatch $f^{\rm data} - f^{\rm model}$.
+    \item Constraint area (or figure of merit) versus survey area
+          $\Omega_s$ and mass threshold $M_{\min}$.
+\end{enumerate}
+
+\section{References}
+
+\begin{itemize}
+    \item Kaiser, N. 1986, MNRAS 222, 323 --- self-similar cluster
+          scaling relations.
+    \item Tinker, J.~L.\ et al. 2008, ApJ 688, 709 --- halo mass
+          function calibration.
+    \item Lima, M.\ \& Hu, W. 2005, Phys.\ Rev.\ D 72, 043006 ---
+          self-calibration and impact of MOR scatter on cluster
+          cosmology.
+    \item Stanek, R.\ et al.\ 2006, ApJ 648, 956 --- log-normal MOR
+          for X-ray clusters.
+    \item Evrard, A.~E.\ et al.\ 2014, MNRAS 441, 3562 ---
+          multi-property log-normal population model.
+    \item Allen, S., Evrard, A., \& Mantz, A. 2011, ARA\&A 49, 409 ---
+          review of cluster cosmology.
+\end{itemize}
+
+\end{document}
