@@ -1,11 +1,11 @@
 [runtime]
-sampler = emcee #test for a single-eval sanity check
+sampler = emcee #emcee #test for a single-eval sanity check
 root = ${PWD}
 resume = F
 verbosity = debug #quiet
 
 [test]
-save_dir = output/test/hmf_counts_v1
+save_dir = output/test/hmf_counts_v2
 fatal_errors = T
 
 [emcee]
@@ -17,11 +17,11 @@ samples = 500              ; quick/rough run (~25 steps/walker); production: 800
 #proposal_scale = 1.0
 
 #[maxlike] this can be used if we are doing a maxlike sampler not a emcee, if we want to find the quick best-fit without sampling, ask xin about it 
-#output_ini = mf_xt/output/mf_manual_v3.ini
+#output_ini = mf_xt/output/mf_manual_v1.ini
 #tolerance = 1e-6
 
 [output]
-filename = output/v1.txt
+filename = output/scatter_free_v1.txt
 format = text
 lock = F
 new_file = T
@@ -30,7 +30,7 @@ new_file = T
 modules = mass_function_like
 values = configs/values.ini
 likelihoods = hmf
-#priors = mf_xt/priors_fit.ini
+;priors = mf_xt/priors_fit.ini
 timing = T
 
 [prior]
@@ -59,5 +59,5 @@ h0_fid     = 0.7
 ; MOR knobs
 alpha_MOR            = 1.0
 frac_scatter_data    = 0.10    ; TRUE scatter in the mock
-frac_scatter_model   = 0.10    ; ASSUMED scatter in the fit
-marginalise_scatter  = F       ; if T, frac_scatter is sampled instead
+scatter_model_free = T
+; frac_scatter_model = 0.10   ; used only if scatter_model_free = F

@@ -18,9 +18,9 @@ Model
 
 Two migration matrices are stored:
   - P_data:  the TRUTH used to generate the mock (frozen in setup)
-  - P_model: what the analyst assumes. Can equal P_data (correct assumption),
-             be the identity (ignore scatter), or be rebuilt each MCMC step
-             from a sampled nuisance parameter (marginalise over scatter).
+  - P_model: rebuilt each MCMC step from the sampled nuisance parameter
+             mor_parameters.frac_scatter   (scatter_model_free = True), OR
+             fixed to frac_scatter_model   (scatter_model_free = False).
 """
 
 import numpy as np
@@ -167,14 +167,22 @@ def setup(options):
     n_mass_bins = options.get_int(option_section, "n_mass_bins", default=10)
     M_edges_logh = np.linspace(np.log10(mmin), np.log10(mmax), n_mass_bins + 1)
 
-    # --- MOR: fractional observable scatter and mass slope ---
-    alpha_MOR   = options.get_double(option_section, "alpha_MOR",           default=1.0)
-    frac_data   = options.get_double(option_section, "frac_scatter_data",   default=0.10)
-    frac_model  = options.get_double(option_section, "frac_scatter_model",  default=0.10)
-    marginalise = options.get_bool  (option_section, "marginalise_scatter", default=False)
+    # --- MOR mass slope (fixed for now) ---
+    alpha_MOR = options.get_double(option_section, "alpha_MOR", default=1.0)
 
-    sigma_logM_data  = sigma_logM_from_MOR(frac_data,  alpha_MOR)
-    sigma_logM_model = sigma_logM_from_MOR(frac_model, alpha_MOR)
+    # --- Data scatter (TRUTH for the mock, frozen) ---
+    frac_data = options.get_double(option_section, "frac_scatter_data", default=0.10)
+    sigma_logM_data = sigma_logM_from_MOR(frac_data, alpha_MOR)
+
+    # --- Model scatter mode ---
+    #   True  -> free parameter, read each step from  mor_parameters.frac_scatter
+    #   False -> fixed at frac_scatter_model  (use for "wrong assumption" tests)
+    scatter_model_free = options.get_bool(
+        option_section, "scatter_model_free", default=True
+    )
+    frac_model_fixed = options.get_double(
+        option_section, "frac_scatter_model", default=frac_data
+    )
 
     # --- MassFunction: one instance, updated per sample and per z-bin ---
     mf = MassFunction(
@@ -198,18 +206,25 @@ def setup(options):
     P_data = build_migration_matrix(M_edges_logh, sigma_logM_data)
     N_obs = np.clip(N_true_fid @ P_data.T, np.finfo(float).eps, None)
 
-    # --- Model migration matrix: fixed, or rebuilt in execute if marginalising ---
-    P_model_fixed = build_migration_matrix(M_edges_logh, sigma_logM_model)
+    # --- Fixed P_model used only when scatter_model_free = False ---
+    P_model_fixed = None
+    if not scatter_model_free:
+        sigma_logM_model = sigma_logM_from_MOR(frac_model_fixed, alpha_MOR)
+        P_model_fixed = build_migration_matrix(M_edges_logh, sigma_logM_model)
 
     # --- Sanity print ---
     print("[hmf_mor_forecast] ================ setup ================")
-    print(f"  h0_fid             = {h0_fid:.3f}")
+    print(f"  h0_fid              = {h0_fid:.3f}")
     print(f"  z in [{zmin:.3f}, {zmax:.3f}],  n_z_bins = {n_z_bins},  area = {area_deg2:.0f} deg^2")
     print(f"  mass in [{mmin:.2e}, {mmax:.2e}] Msun/h,  n_mass_bins = {n_mass_bins}")
-    print(f"  alpha_MOR          = {alpha_MOR:.3f}")
-    print(f"  frac_scatter_data  = {frac_data:.3f}  -> sigma_logM = {sigma_logM_data:.4f} dex")
-    print(f"  frac_scatter_model = {frac_model:.3f}  -> sigma_logM = {sigma_logM_model:.4f} dex")
-    print(f"  marginalise_scatter = {marginalise}")
+    print(f"  alpha_MOR           = {alpha_MOR:.3f}")
+    print(f"  frac_scatter_data   = {frac_data:.3f}  -> sigma_logM = {sigma_logM_data:.4f} dex")
+    print(f"  scatter_model_free  = {scatter_model_free}")
+    if scatter_model_free:
+        print(f"  frac_scatter_model  = SAMPLED  (mor_parameters.frac_scatter)")
+    else:
+        s = sigma_logM_from_MOR(frac_model_fixed, alpha_MOR)
+        print(f"  frac_scatter_model  = {frac_model_fixed:.3f} (fixed) -> sigma_logM = {s:.4f} dex")
     print(f"  true      total counts (fid): {N_true_fid.sum():.1f}")
     print(f"  observed  total counts (fid): {N_obs.sum():.1f}")
     print("[hmf_mor_forecast] =======================================")
@@ -225,7 +240,7 @@ def setup(options):
         "P_data": P_data,
         "P_model_fixed": P_model_fixed,
         "alpha_MOR": alpha_MOR,
-        "marginalise": marginalise,
+        "scatter_model_free": scatter_model_free,
     }
 
 
@@ -237,9 +252,9 @@ def execute(block, config):
     sigma8 = block[names.cosmological_parameters, "sigma8_input"]
     h0     = block[names.cosmological_parameters, "h0"]
 
-    # Model migration matrix: fixed, or rebuilt from a sampled nuisance param
-    if config["marginalise"]:
-        frac_model = block[names.cosmological_parameters, "frac_scatter"]
+    # --- Model migration matrix (rebuilt if scatter is free) ---
+    if config["scatter_model_free"]:
+        frac_model = block["mor_parameters", "frac_scatter"]
         sig_logM   = sigma_logM_from_MOR(frac_model, config["alpha_MOR"])
         P_model    = build_migration_matrix(config["M_edges_logh"], sig_logM)
     else:
