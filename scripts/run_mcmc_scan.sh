@@ -1,14 +1,14 @@
 #!/bin/bash -l
 #SBATCH --partition=general
-#SBATCH -J hmf_scatter_fixed_02
-#SBATCH --array=0-4
+#SBATCH -J hmf_scatter_fixed_02_area
+#SBATCH --array=0-2
 #SBATCH --ntasks=21
 #SBATCH --cpus-per-task=1
 #SBATCH -t 08:00:00
 #SBATCH --mail-user=xt52@sussex.ac.uk
 #SBATCH --mail-type=ALL
-#SBATCH -o /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_02_%j.log
-#SBATCH -e /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_02_%j.error
+#SBATCH -o /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_02_area_%j.log
+#SBATCH -e /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_02_area_%j.error
 
 # ============================================================
 #
@@ -50,19 +50,19 @@ echo "=============================================="
 
 cd /its/home/xt52/hmf-mor-forecast
 
-# frac_scatter_model values to scan (frac_scatter_data stays fixed at 0.20).
-FRACS=(0.0 0.05 0.1 0.2 0.4)
-TAGS=(sm00 sm05 sm10 sm20 sm40)
+# area_deg2 values to scan
+AREA=(1000.0 2000.0 8000.0)
+TAGS=(A1 A2 A8)
 
-FRAC=${FRACS[$SLURM_ARRAY_TASK_ID]}
+AREA=${AREA[$SLURM_ARRAY_TASK_ID]}
 TAG=${TAGS[$SLURM_ARRAY_TASK_ID]}
 
 # Run the pipeline
 start=$(date +%s)
 
-mpirun -np $SLURM_NTASKS cosmosis --mpi configs/forecast_M2e14_A4000_sd10_free.ini \
-    -p mass_function_like.frac_scatter_model=${FRAC} \
-       output.filename=output/scatter_fixed_02_${TAG}.txt
+mpirun -np $SLURM_NTASKS cosmosis --mpi configs/forecast_M2e14_A4000_sd20_fixed.ini \
+    -p mass_function_like.area_deg2=${AREA} \
+       output.filename=output/scatter_fixed_02_area_${TAG}.txt
 
 end=$(date +%s)
 runtime=$((end - start))
