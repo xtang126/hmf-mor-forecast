@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --partition=general
-#SBATCH -J hmf_scatter_fixed_02_mt
+#SBATCH -J hmf_scatter_fixed_02_area
 #SBATCH --array=0-4
 #SBATCH --ntasks=21
 #SBATCH --cpus-per-task=1
@@ -50,7 +50,7 @@ echo "=============================================="
 
 cd /its/home/xt52/hmf-mor-forecast
 
-# area_deg2/others values to scan
+# area_deg2 values to scan
 CONFIG=(0.05 0.00 0.10 0.20 0.40)
 TAGS=(sm05 sm00 sm10 sm20 sm40)
 
