@@ -1,14 +1,14 @@
 #!/bin/bash -l
 #SBATCH --partition=general
-#SBATCH -J hmf_scatter_fixed_02_mt
-#SBATCH --array=0-2
+#SBATCH -J hmf_scatter_fixed
+#SBATCH --array=0-4
 #SBATCH --ntasks=21
 #SBATCH --cpus-per-task=1
 #SBATCH -t 08:00:00
 #SBATCH --mail-user=xt52@sussex.ac.uk
 #SBATCH --mail-type=ALL
-#SBATCH -o /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_02_mt_%j.log
-#SBATCH -e /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_02_mt_%j.error
+#SBATCH -o /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_%j.log
+#SBATCH -e /its/home/xt52/hmf-mor-forecast/log/hmf_scatter_fixed_%j.error
 
 # ============================================================
 #
@@ -50,37 +50,20 @@ echo "=============================================="
 
 cd /its/home/xt52/hmf-mor-forecast
 
-# area_deg2/others values to scan
-#CONFIG=(0.05 0.00 0.10 0.20 0.40)
-#TAGS=(sm05 sm00 sm10 sm20 sm40)
+# Sweep scatter with data == model (correct-fixed mode)
+SCATTER_VALS=(0.05 0.10 0.20 0.40 0.80)
+TAGS=(sm05 sm10 sm20 sm40 sm80)
 
-#CONFIG=${CONFIG[$SLURM_ARRAY_TASK_ID]}
-#TAG=${TAGS[$SLURM_ARRAY_TASK_ID]}
-
-# Mass windows to scan (each 1 dex wide); mock is generated with sd=0.20
-# Mid window (1e14-1e15) is the reference — matches the default config
-MMIN_VALUES=(5e13 1e14 5e14)
-MMAX_VALUES=(5e14 1e15 5e15)
-TAGS=(M5e13-5e14 M1e14-1e15 M5e14-5e15)
-
-mmin=${MMIN_VALUES[$SLURM_ARRAY_TASK_ID]}
-mmax=${MMAX_VALUES[$SLURM_ARRAY_TASK_ID]}
-tag=${TAGS[$SLURM_ARRAY_TASK_ID]}
-
-if [[ -z "$mmin" || -z "$mmax" ]]; then
-    echo "ERROR: SLURM_ARRAY_TASK_ID=$SLURM_ARRAY_TASK_ID out of range" >&2
-    exit 1
-fi
-
-echo "Task ${SLURM_ARRAY_TASK_ID}: mass_min=${mmin}  mass_max=${mmax}  tag=${tag}"
+SCATTER=${SCATTER_VALS[$SLURM_ARRAY_TASK_ID]}
+TAG=${TAGS[$SLURM_ARRAY_TASK_ID]}
 
 # Run the pipeline
 start=$(date +%s)
 
-mpirun -np $SLURM_NTASKS cosmosis --mpi configs/forecast_A4000_sd20_fixed.ini \
-    -p mass_function_like.mass_min="${mmin}" \
-       mass_function_like.mass_max="${mmax}" \
-       output.filename=output/scatter_fixed_02_mass_${tag}.txt
+mpirun -np $SLURM_NTASKS cosmosis --mpi configs/forecast_M2e14_A4000_sd_fixed.ini \
+    -p mass_function_like.frac_scatter_data="${SCATTER}" \
+       mass_function_like.frac_scatter_model="${SCATTER}" \
+       output.filename=output/scatter_fixed_sd_${TAG}.txt
 
 end=$(date +%s)
 runtime=$((end - start))
