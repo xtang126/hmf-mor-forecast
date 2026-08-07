@@ -1,6 +1,6 @@
 #!/bin/bash -l
 #SBATCH --partition=general
-#SBATCH -J hmf_scatter_fixed_02_mt
+#SBATCH -J hmf_scatter_free
 #SBATCH --array=0-2
 #SBATCH --ntasks=21
 #SBATCH --cpus-per-task=1
