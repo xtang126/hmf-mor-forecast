@@ -1,13 +1,13 @@
 #!/bin/bash -l
 #SBATCH --partition=general
-#SBATCH -J hmf_gamma_gd30_free
+#SBATCH -J hmf_gamma_gd30_free_frac
 #SBATCH --ntasks=21
 #SBATCH --cpus-per-task=1
 #SBATCH -t 08:00:00
 #SBATCH --mail-user=xt52@sussex.ac.uk
 #SBATCH --mail-type=ALL
-#SBATCH -o /its/home/xt52/hmf-mor-forecast/log/hmf_gamma_gd30_free_%j.log
-#SBATCH -e /its/home/xt52/hmf-mor-forecast/log/hmf_gamma_gd30_free_%j.error
+#SBATCH -o /its/home/xt52/hmf-mor-forecast/log/hmf_gamma_gd30_free_frac_%j.log
+#SBATCH -e /its/home/xt52/hmf-mor-forecast/log/hmf_gamma_gd30_free_frac_%j.error
 
 # ============================================================
 #
@@ -53,7 +53,7 @@ cd /its/home/xt52/hmf-mor-forecast
 start=$(date +%s)
 
 #cosmosis configs/forecast_M2e14_A4000_sd20_g00_fixed.ini
-mpirun -np $SLURM_NTASKS cosmosis --mpi configs/forecast_M2e14_A4000_sd20_gt30_free_gamma.ini
+mpirun -np $SLURM_NTASKS cosmosis --mpi configs/forecast_M2e14_A4000_sd20_gt30_free_frac.ini
 
 end=$(date +%s)
 runtime=$((end - start))
