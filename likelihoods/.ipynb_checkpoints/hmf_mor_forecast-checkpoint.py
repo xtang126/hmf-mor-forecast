@@ -210,7 +210,8 @@ def setup(options):
     bin_centres_logh = 0.5 * (M_edges_logh[1:] + M_edges_logh[:-1])
  
     # --- MOR mass slope (fixed for now) ---
-    alpha_MOR = options.get_double(option_section, "alpha_MOR", default=1.0)
+    alpha_MOR_data  = options.get_double(option_section, "alpha_MOR_data",  default=1.0)
+    alpha_MOR_model = options.get_double(option_section, "alpha_MOR_model", default=alpha_MOR_data)
  
     # --- Pivot mass for the scatter mass-trend (Msun/h, linear) ---
     # Defaults to the geometric mean of the mass range.
@@ -226,7 +227,7 @@ def setup(options):
     frac_data = options.get_double(option_section, "frac_scatter_data", default=0.10)
     gamma_scatter_data = options.get_double(option_section, "gamma_scatter_data", default=0.0)
     sigma_logM_data = sigma_logM_from_MOR(
-        frac_data, alpha_MOR,
+        frac_data, alpha_MOR_data,
         bin_centres_logh=bin_centres_logh, M_piv_logh=M_piv_logh,
         gamma_scatter=gamma_scatter_data,
     )
@@ -277,7 +278,7 @@ def setup(options):
     P_model_fixed = None
     if not need_rebuild_pmodel:
         sigma_logM_model = sigma_logM_from_MOR(
-            frac_model_fixed, alpha_MOR,
+            frac_model_fixed, alpha_MOR_model,
             bin_centres_logh=bin_centres_logh, M_piv_logh=M_piv_logh,
             gamma_scatter=gamma_scatter_model_fixed,
         )
@@ -288,7 +289,8 @@ def setup(options):
     print(f"  h0_fid              = {h0_fid:.3f}")
     print(f"  z in [{zmin:.3f}, {zmax:.3f}],  n_z_bins = {n_z_bins},  area = {area_deg2:.0f} deg^2")
     print(f"  mass in [{mmin:.2e}, {mmax:.2e}] Msun/h,  n_mass_bins = {n_mass_bins}")
-    print(f"  alpha_MOR           = {alpha_MOR:.3f}")
+    print(f"  alpha_MOR_data      = {alpha_MOR_data:.3f}")
+    print(f"  alpha_MOR_model      = {alpha_MOR_model:.3f}")
     print(f"  M_piv               = {M_piv:.3e} Msun/h")
     print(f"  frac_scatter_data   = {frac_data:.3f}, gamma_scatter_data = {gamma_scatter_data:.3f}")
     print(f"    -> sigma_logM(data) range = [{sigma_logM_data.min():.4f}, {sigma_logM_data.max():.4f}] dex")
@@ -315,7 +317,8 @@ def setup(options):
         "N_obs": N_obs,
         "P_data": P_data,
         "P_model_fixed": P_model_fixed,
-        "alpha_MOR": alpha_MOR,
+        "alpha_MOR_data":  alpha_MOR_data,
+        "alpha_MOR_model": alpha_MOR_model,
         "scatter_model_free": scatter_model_free,
         "gamma_scatter_free": gamma_scatter_free,
         "need_rebuild_pmodel": need_rebuild_pmodel,
@@ -345,7 +348,7 @@ def execute(block, config):
             else config["gamma_scatter_model_fixed"]
         )
         sig_logM_model = sigma_logM_from_MOR(
-            frac_model, config["alpha_MOR"],
+            frac_model, config["alpha_MOR_model"],
             bin_centres_logh=config["bin_centres_logh"],
             M_piv_logh=config["M_piv_logh"],
             gamma_scatter=gamma_model,
